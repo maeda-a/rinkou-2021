@@ -1,8 +1,7 @@
 # Compiler: sec.4.4
 
 from dataclasses import dataclass
-from typing import Sequence
-from typing import Union
+from typing import Sequence, TypeAlias, Union, cast, TypeVar
 
 from syntax_2_1_7 import *
 
@@ -31,15 +30,15 @@ class Popenv(Instruction): pass
 
 @dataclass
 class Mkclos(Instruction):
-    i: Sequence[code]
+    i: list[Instruction]
 
 @dataclass
 class Apply(Instruction): pass
 
 @dataclass
 class Test(Instruction):
-    i: Sequence[code]
-    j: Sequence[code]
+    i: list[Instruction]
+    j: list[Instruction]
 
 @dataclass
 class Add(Instruction): pass
@@ -55,10 +54,12 @@ class Div(Instruction): pass
 
 @dataclass
 class MachineClosure(Value):
-    i: Sequence[Code]
-    e: Sequence[value]
+    i: list[Instruction]
+    e: list[Value]
 
-Stack: TypeAlias = Sequence[Value | Sequence[Value]]
+MachineEnv = list[Value]                  # type alias
+StackElem = Union[Value,MachineEnv]       # type alias
+Stack = list[StackElem]                   # type alias
 
 def trimValue(v): # for debug
     match v:
@@ -67,10 +68,28 @@ def trimValue(v): # for debug
         case []: return "[]"
         case _: return type(v).__name__
 
+# PythonのSequenceを結合して型検査を通す
+T = TypeVar('T')
+def concat(s1: Sequence[T], s2: Sequence[T]) -> Sequence[T]:
+    l1 = cast(list[T], s1)
+    l2 = cast(list[T], s2)
+    return cast(Sequence[T], l1 + l2)
+
+def calc(op: Instruction, l: StackElem, r: StackElem) -> Num:
+    if type(l) != Num or type(r) != Num:
+        raise Exception("Non-number operand for {}: {}, {}".format(str(op), str(l), str(r)))
+    m = cast(Num, l).n; n = cast(Num, r).n
+    match op:
+        case Add(): return Num(m + n)
+        case Sub(): return Num(m - n)
+        case Mult(): return Num(m * n)
+        case Div(): return Num(m // n)
+        case _: raise Exception("Can't happen.")
+
 # stackは教科書と逆に末尾に破壊的にpushし、末尾からpopする。
 # envは教科書と逆に先頭にコピーして追加する。Searchの引数は先頭からの位置を表す。
 # codeは先頭から破壊的にpopし、先頭にコピーして結合する。
-def PCFmachine(acc: Value, stack: Stack, env: Sequence[Value], code: Sequence[Instruction]) -> Value:
+def PCFmachine(acc: Value, stack: Stack, env: list[Value], code: list[Instruction]) -> Value:
     while code:
         # print("acc={}, stack={}, env={}, code={}".format(acc, trimValue(stack), trimValue(env), trimValue(code)))
         insn = code.pop(0)
@@ -80,13 +99,13 @@ def PCFmachine(acc: Value, stack: Stack, env: Sequence[Value], code: Sequence[In
             case Push():
                 stack.append(acc)
             case Extend():
-                env = [acc] + env
+                env = list([acc]) + env
             case Search(n):
                 acc = env[n]
             case Pushenv():
                 stack.append(env)
             case Popenv():
-                env = stack.pop()
+                env = cast(MachineEnv, stack.pop())
             case Apply():
                 w = stack.pop()
                 match acc:
@@ -97,14 +116,7 @@ def PCFmachine(acc: Value, stack: Stack, env: Sequence[Value], code: Sequence[In
                         raise Exception("Not a closure: " + str(acc))
             case Ldi(n):
                 acc = Num(n)
-            case Add():
-                m = stack.pop(); acc = Num(acc.n + m.n)
-            case Sub():
-                m = stack.pop(); acc = Num(acc.n - m.n)
-            case Mult():
-                m = stack.pop(); acc = Num(acc.n * m.n)
-            case Div():
-                m = stack.pop(); acc = Num(acc.n / m.n)
+            case Add(), Sub(), Mult(), Div(): m = stack.pop(); acc = calc(insn, m, acc)
             case Test(i, j):
                 match acc:
                     case Num(0):
@@ -115,7 +127,10 @@ def PCFmachine(acc: Value, stack: Stack, env: Sequence[Value], code: Sequence[In
                         raise Exception("Not a number: " + str(acc))
     return acc
 
-def compilePCF(t: term, env: Sequence[Var]) -> Sequence[Code]:
+def insnList(*l: Instruction) -> list[Instruction]:
+    return list(l)
+
+def compilePCF(t: Term, env: list[Var]) -> list[Instruction]:
     match t:
         case Var(name):
             for (index, v) in enumerate(env):
@@ -123,7 +138,7 @@ def compilePCF(t: term, env: Sequence[Var]) -> Sequence[Code]:
                     return [Search(index)]
             raise Exception("Unbound variable: " + name)
         case App(t, u):
-            return [Pushenv()] + compilePCF(u, env) + [Push()] + compilePCF(t, env) + [Apply(), Popenv()]
+            return insnList(Pushenv()) + compilePCF(u, env) + insnList(Push()) + compilePCF(t, env) + [Apply(), Popenv()]
         case Fun(x, t):
             return [Mkclos(compilePCF(t, [x, Var('')] + env))]
         case FixFun(f, x, t):
@@ -132,11 +147,11 @@ def compilePCF(t: term, env: Sequence[Var]) -> Sequence[Code]:
             return [Ldi(n)]
         case Op(op, t, u):
             dic = {'+': Add(), '-': Sub(), '*': Mult(), '/': Div()}
-            return compilePCF(u, env) + [Push()] + compilePCF(t, env) + [dic[op]]
+            return compilePCF(u, env) + insnList(Push()) + compilePCF(t, env) + [dic[op]]
         case Ifz(t, u, v):
-            return compilePCF(t, env) + [Test(compilePCF(u, env), compilePCF(v, env))]
+            return compilePCF(t, env) + insnList(Test(compilePCF(u, env), compilePCF(v, env)))
         case Let(x, t, u):
-            return [Pushenv()] + compilePCF(t, env) + [Extend()] + compilePCF(u, [x] + env) + [Popenv()]
+            return insnList(Pushenv()) + compilePCF(t, env) + insnList(Extend()) + compilePCF(u, [x] + env) + insnList(Popenv())
         case _:
             raise Exception("Illegal term: " + str(t))
 

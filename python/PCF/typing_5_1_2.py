@@ -4,19 +4,19 @@ from typing import Union
 
 from typed_syntax_5_1_1 import *
 
-TypeEnv: TypeAlias = Sequence[tuple[Var,Type]]
+TypeEnv = list[tuple[Var,PCFType]]
 
-def searchEnv(x: Var, e: TypeEnv) -> Type:
+def searchEnv(x: Var, e: TypeEnv) -> PCFType:
     for (var, val) in e:
         if var == x:
             return val
     raise Exception("Unbound variable: " + str(x))
 
-def checkNumber(a: Type) -> None:
+def checkNumber(a: PCFType) -> None:
     if a != Nat():
         raise Exception("Not a number: " + str(a))
 
-def PCFtype(t: Term, e: TypeEnv) -> Type:
+def PCFtype(t: Term, e: TypeEnv) -> PCFType:
     match t:
         case Var(x): return searchEnv(t, e)
         case App(t, u):
@@ -48,6 +48,7 @@ def PCFtype(t: Term, e: TypeEnv) -> Type:
             if a != a1:
                 raise Exception("Type mismatch in {}: {} expected, given {}.".format(str(t), str(a), str(a1)))
             return PCFtype(u, [(x, a)] + e)
+        case _: raise Exception("Unknown term: " + str(t))
 
 print(PCFtype(Op('+', Num(1), Num(2)), []))
 print(PCFtype(Var('x'), [(Var('x'), Nat())]))
@@ -55,4 +56,4 @@ print(PCFtype(Fun(Var('x'), Nat(), Op('*', Var('x'), Var('x'))), []))
 print(PCFtype(App(Fun(Var('x'), Nat(), Op('*', Var('x'), Var('x'))), Num(3)), []))
 print(PCFtype(App(Fix(Var('x'), Function(Nat(), Nat()), Fun(Var('x'), Nat(), Op('*', Var('x'), Var('x')))), Num(3)), []))
 print(PCFtype(App(Fix(Var('f'), Function(Nat(), Nat()), Fun(Var('x'), Nat(), Ifz(Var('x'), Num(1), Op('*', Var('x'), App(Var('f'), Op('-', Var('x'), Num(1))))))), Num(10)), []))
-print(PCFtype(App(Fun(Var('x'), Function(TypeVar('A'), TypeVar('B')), App(Var('x'), Var('x'))), Fun(Var('x'), Function(TypeVar('A'), TypeVar('B')), App(Var('x'), Var('x')))), []))
+print(PCFtype(App(Fun(Var('x'), Function(PCFTypeVar('A'), PCFTypeVar('B')), App(Var('x'), Var('x'))), Fun(Var('x'), Function(PCFTypeVar('A'), PCFTypeVar('B')), App(Var('x'), Var('x')))), []))

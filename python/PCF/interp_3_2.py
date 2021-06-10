@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from syntax_2_1_7 import *
 
-Environment = Sequence[tuple[Var,Term]]
+Environment = list[tuple[Var,Term]]
 
 @dataclass
 class Closure(Value):
@@ -23,7 +23,7 @@ def searchEnv(x: Var, e: Environment) -> Value:
             match val:
                 case Thunk(term, e2):
                     return interp(term, e2)
-                case _: return val
+                case Value(): return val
     raise Exception("Unbound variable: " + str(x))
 
 def extendEnv(x: Var, t: Term, e: Environment) -> Environment:
@@ -53,10 +53,7 @@ def interp(t: Term, e: Environment) -> Value:
                 case '+': return Num(lv + rv)
                 case '-': return Num(lv - rv)
                 case '*': return Num(lv * rv)
-                case '/': return Num(lv / rv)
-                case '%': return Num(lv % rv)
-                case '<': return Num(1 if lv < rv else 0)
-                case '=': return Num(1 if lv == rv else 0)
+                case '/': return Num(lv // rv)
                 case _: raise Exception("Unknown op: " + str(op))
         case Ifz(cond, t, u):
             c = interp(cond, e)
@@ -69,6 +66,7 @@ def interp(t: Term, e: Environment) -> Value:
         case Let(x, t, u):
             w = interp(t, e)
             return interp(u, extendEnv(x, w, e))
+        case _: raise Exception("Unknown term: " + str(t))
 
 print(interp(Op('+', Num(1), Num(2)), []))
 print(interp(Var('x'), [(Var('x'), Num(1))]))

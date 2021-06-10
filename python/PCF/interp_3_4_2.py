@@ -1,7 +1,9 @@
 # optimized interpreter in 3.4.2
 # new syntax: FixFun(f, x, term): short hand for Fix(f, Fun(x, term))
 
-from interp_3_2 import *
+from syntax_2_1_7 import *
+
+Environment = list[tuple[Var,Value]]    # 環境には値しか入らない
 
 @dataclass
 class RecClosure(Value):
@@ -10,7 +12,16 @@ class RecClosure(Value):
     t: Term
     e: Environment
 
-# 差し替える部分
+# Thunkはない
+
+def extendEnv(x: Var, t: Value, e: Environment) -> Environment:
+    return [(x, t)] + e
+
+def checkNumber(num: Value) -> int:
+    match num:
+        case Num(n): return n
+    raise Exception("Not a number: " + str(num))
+
 def searchEnv(x: Var, e: Environment) -> Value:
     for (var, val) in e:
         if var == x:
@@ -36,10 +47,7 @@ def interp(t: Term, e: Environment) -> Value:
                 case '+': return Num(lv + rv)
                 case '-': return Num(lv - rv)
                 case '*': return Num(lv * rv)
-                case '/': return Num(lv / rv)
-                case '%': return Num(lv % rv)
-                case '<': return Num(1 if lv < rv else 0)
-                case '=': return Num(1 if lv == rv else 0)
+                case '/': return Num(lv // rv)
                 case _: raise Exception("Unknown op: " + str(op))
         case Ifz(cond, t, u):
             c = interp(cond, e)
@@ -52,5 +60,6 @@ def interp(t: Term, e: Environment) -> Value:
         case Let(x, t, u):
             w = interp(t, e)
             return interp(u, extendEnv(x, w, e))
+        case _: raise Exception("Unknown term: " + str(t))
 
 print(interp(App(FixFun(Var('f'), Var('x'), Ifz(Var('x'), Num(1), Op('*', Var('x'), App(Var('f'), Op('-', Var('x'), Num(1)))))), Num(10)), [])) # Recursive function call using FixFun

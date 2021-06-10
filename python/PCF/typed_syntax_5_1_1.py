@@ -1,23 +1,22 @@
 # Syntax (AST) of PCF: sec.2.1.7
 
 from dataclasses import dataclass
-from typing import Sequence, Union
 
 
 @dataclass
-class Type: pass
+class PCFType: pass
 
 @dataclass
-class TypeVar:
+class PCFTypeVar(PCFType):
     name: str
 
 @dataclass
-class Nat(Type): pass
+class Nat(PCFType): pass
 
 @dataclass
-class Function(Type):
-    source: Type
-    dest: Type
+class Function(PCFType):
+    source: PCFType
+    dest: PCFType
 
 @dataclass
 class Term: pass
@@ -29,7 +28,7 @@ class Var(Term):
 @dataclass
 class Fun(Term):
     x: Var
-    a: Type
+    a: PCFType
     t: Term
 
 @dataclass
@@ -59,12 +58,12 @@ class Ifz(Term):
 @dataclass
 class Fix(Term):
     x: Var
-    a: Type
+    a: PCFType
     t: Term
 
 @dataclass
 class Let(Term):
     x: Var
-    a: Type
+    a: PCFType
     t: Term
     body: Term

@@ -1,7 +1,6 @@
 # Syntax (AST) of PCF: sec.2.1.7
 
 from dataclasses import dataclass
-from typing import Sequence, Union
 
 @dataclass
 class Term: pass
