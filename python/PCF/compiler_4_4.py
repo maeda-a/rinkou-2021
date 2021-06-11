@@ -1,5 +1,6 @@
 # Compiler: sec.4.4
 
+#%%
 from dataclasses import dataclass
 from typing import Sequence, TypeAlias, Union, cast, TypeVar
 
@@ -80,10 +81,10 @@ def calc(op: Instruction, l: StackElem, r: StackElem) -> Num:
         raise Exception("Non-number operand for {}: {}, {}".format(str(op), str(l), str(r)))
     m = cast(Num, l).n; n = cast(Num, r).n
     match op:
-        case Add(): return Num(m + n)
-        case Sub(): return Num(m - n)
-        case Mult(): return Num(m * n)
-        case Div(): return Num(m // n)
+        case Add(): return Num(n + m)
+        case Sub(): return Num(n - m)
+        case Mult(): return Num(n * m)
+        case Div(): return Num(n // m)
         case _: raise Exception("Can't happen.")
 
 # stackは教科書と逆に末尾に破壊的にpushし、末尾からpopする。
@@ -91,7 +92,6 @@ def calc(op: Instruction, l: StackElem, r: StackElem) -> Num:
 # codeは先頭から破壊的にpopし、先頭にコピーして結合する。
 def PCFmachine(acc: Value, stack: Stack, env: list[Value], code: list[Instruction]) -> Value:
     while code:
-        # print("acc={}, stack={}, env={}, code={}".format(acc, trimValue(stack), trimValue(env), trimValue(code)))
         insn = code.pop(0)
         match insn:
             case Mkclos(i):
@@ -116,7 +116,8 @@ def PCFmachine(acc: Value, stack: Stack, env: list[Value], code: list[Instructio
                         raise Exception("Not a closure: " + str(acc))
             case Ldi(n):
                 acc = Num(n)
-            case Add(), Sub(), Mult(), Div(): m = stack.pop(); acc = calc(insn, m, acc)
+            case Add() | Sub() | Mult() | Div():
+                m = stack.pop(); acc = calc(insn, m, acc)
             case Test(i, j):
                 match acc:
                     case Num(0):
@@ -125,6 +126,8 @@ def PCFmachine(acc: Value, stack: Stack, env: list[Value], code: list[Instructio
                         code = j + code
                     case _:
                         raise Exception("Not a number: " + str(acc))
+            case _:
+                raise Exception("Unknown instruction: " + str(insn))
     return acc
 
 def insnList(*l: Instruction) -> list[Instruction]:
@@ -158,8 +161,10 @@ def compilePCF(t: Term, env: list[Var]) -> list[Instruction]:
 import pprint
 
 def compileTest(t: Term) -> None:
-    print("# Source term")
+    print("# Source Term AST")
     pprint.pp(t)
+    print("# Sourcer Term string")
+    print(AST_to_str(t))
     print("# Compiled code")
     code = compilePCF(t, [])
     pprint.pp(code)
@@ -167,11 +172,12 @@ def compileTest(t: Term) -> None:
     pprint.pp(PCFmachine(Num(0), [], [], code))
     print()
 
-
+#%%
 compileTest(App(Fun(Var('x'), Var('x')),Num(1))) # => 1
 compileTest(App(Fun(Var('x'), Op('*', Var('x'), Var('x'))),Num(3))) # => 9
 compileTest(App(App(FixFun(Var('f'),Var('x'), Fun(Var('y'),Op('*', Var('x'), Var('y')))),Num(2)),Num(3))) # => 6
 
+#%%
 factcall = Let(Var('f'), 
                 FixFun(Var('g'), Var('x'), 
                        Ifz(Var('x'), Num(1), 
@@ -179,3 +185,5 @@ factcall = Let(Var('f'),
                                     App(Var('g'), Op('-', Var('x'), Num(1)))))),
                 App(Var('f'), Num(6)))
 compileTest(factcall)
+
+# %%

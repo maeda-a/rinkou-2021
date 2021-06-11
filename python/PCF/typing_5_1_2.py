@@ -1,3 +1,4 @@
+#%%
 from dataclasses import dataclass
 from typing import Sequence
 from typing import Union
@@ -50,10 +51,26 @@ def PCFtype(t: Term, e: TypeEnv) -> PCFType:
             return PCFtype(u, [(x, a)] + e)
         case _: raise Exception("Unknown term: " + str(t))
 
-print(PCFtype(Op('+', Num(1), Num(2)), []))
-print(PCFtype(Var('x'), [(Var('x'), Nat())]))
-print(PCFtype(Fun(Var('x'), Nat(), Op('*', Var('x'), Var('x'))), []))
-print(PCFtype(App(Fun(Var('x'), Nat(), Op('*', Var('x'), Var('x'))), Num(3)), []))
-print(PCFtype(App(Fix(Var('x'), Function(Nat(), Nat()), Fun(Var('x'), Nat(), Op('*', Var('x'), Var('x')))), Num(3)), []))
-print(PCFtype(App(Fix(Var('f'), Function(Nat(), Nat()), Fun(Var('x'), Nat(), Ifz(Var('x'), Num(1), Op('*', Var('x'), App(Var('f'), Op('-', Var('x'), Num(1))))))), Num(10)), []))
-print(PCFtype(App(Fun(Var('x'), Function(PCFTypeVar('A'), PCFTypeVar('B')), App(Var('x'), Var('x'))), Fun(Var('x'), Function(PCFTypeVar('A'), PCFTypeVar('B')), App(Var('x'), Var('x')))), []))
+#%%
+import pprint
+
+def typingTest(t: Term) -> None:
+    print("# Source Term AST")
+    pprint.pp(t)
+    print("# Sourcer Term string")
+    print(typed_AST_to_str(t))
+    print("# Type AST")
+    typ = PCFtype(t, [])
+    pprint.pp(typ)
+    print("# Type string")
+    print(type_to_str(typ))
+    print()
+
+#%%
+typingTest(Op('+', Num(1), Num(2)))
+typingTest(Fun(Var('x'), Nat(), Op('*', Var('x'), Var('x'))))
+typingTest(App(Fun(Var('x'), Nat(), Op('*', Var('x'), Var('x'))), Num(3)))
+typingTest(App(Fix(Var('x'), Function(Nat(), Nat()), Fun(Var('x'), Nat(), Op('*', Var('x'), Var('x')))), Num(3)))
+typingTest(App(Fix(Var('f'), Function(Nat(), Nat()), Fun(Var('x'), Nat(), Ifz(Var('x'), Num(1), Op('*', Var('x'), App(Var('f'), Op('-', Var('x'), Num(1))))))), Num(10)))
+#%%
+typingTest(App(Fun(Var('x'), Function(PCFTypeVar('A'), PCFTypeVar('B')), App(Var('x'), Var('x'))), Fun(Var('x'), Function(PCFTypeVar('A'), PCFTypeVar('B')), App(Var('x'), Var('x')))))
